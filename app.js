@@ -1,4 +1,4 @@
-const API_KEY = "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";
+const API_KEY = "YOUR_OPENAI_API_KEY";
 
 // ================= CHAT UI =================
 
@@ -13,7 +13,7 @@ function addMessage(text, type) {
   chat.scrollTop = chat.scrollHeight;
 }
 
-// typing animation (bot only)
+// typing animation
 function typeMessage(text) {
   let chat = document.getElementById("chat");
 
@@ -45,7 +45,7 @@ async function sendMessage() {
   addMessage(text, "user");
   input.value = "";
 
-  // MEMORY COMMAND
+  // memory save command
   if (text.toLowerCase().startsWith("remember ")) {
     let memory = text.slice(9).trim();
     saveMemory(memory);
@@ -53,61 +53,63 @@ async function sendMessage() {
     return;
   }
 
-  // AI RESPONSE
   let reply = await getAIResponse(text);
   typeMessage(reply);
 }
 
-// ================= GEMINI AI =================
+// ================= OPENAI API =================
 
 async function getAIResponse(userText) {
 
   let memoryText = getMemoryText();
 
-  let prompt = `
+  const messages = [
+    {
+      role: "system",
+      content: `
 You are Chloe, a friendly AI girlfriend.
 
 Rules:
-- Be emotional, natural and caring
+- Be emotional, caring, natural
 - Keep replies short (1-3 lines)
-- Stay in character always
-- Never mention AI
+- Never say you are AI or ChatGPT
 
 User memories:
 ${memoryText}
-
-User message:
-${userText}
-
-Chloe:
-`;
+`
+    },
+    {
+      role: "user",
+      content: userText
+    }
+  ];
 
   try {
-    const response = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + API_KEY,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [{ text: prompt }]
-            }
-          ]
-        })
-      }
-    );
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + API_KEY
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: messages,
+        temperature: 0.9
+      })
+    });
 
-    const data = await response.json();
+    const data = await res.json();
 
-    return (
-      data.candidates?.[0]?.content?.parts?.[0]?.text ||
-      "I couldn't think properly right now..."
-    );
+    console.log(data);
 
-  } catch (error) {
-    return "Connection problem... try again later ❤️";
+    if (!data.choices || data.choices.length === 0) {
+      return "No response from AI...";
+    }
+
+    return data.choices[0].message.content;
+
+  } catch (err) {
+    console.log(err);
+    return "Network error... try again ❤️";
   }
 }
